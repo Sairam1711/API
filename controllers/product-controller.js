@@ -1,144 +1,126 @@
-// Sample in-memory product data
-
-;
-const Product = require('../models/products');  // Assuming you have a Product model
-const DButils = require('../utils/DButils');
-
-// Create a new product
+const Product = require('../models/products');
+const DButils=require('../utils/DButils')
+// Create Product
 exports.createProduct = async (req, res) => {
   try {
-    const { category, brand, name, image, topSeller, price } = req.body;
+    const { name, description, category, brand, price, stock, images, sku ,topSeller} = req.body;
 
-    // Validate the required fields
-    if (!category || !brand || !name || !image || !topSeller || !price) {
-      return res.status(400).json({ message: "All  fields are required." });
-    }
+    // Check if product exists
+    const existingProduct = await Product.findOne({ sku });
+    if (existingProduct) return res.status(400).json({ message: 'Product already exists' });
 
-    // Create a new product
     const newProduct = new Product({
+      name,
+      description,
       category,
       brand,
-      name,
-      image,
-      topSeller,
-      price
+      price,
+      stock,
+      images,
+      sku,
+      topSeller
     });
 
-    // Save the product to the database
-    const savedProduct = await newProduct.save();
-    res.status(201).json(savedProduct);
+    await newProduct.save();
 
+    res.status(201).json({ message: 'Product created successfully', product: newProduct });
   } catch (error) {
-    console.error("Error creating product:", error);
-    res.status(500).json({ message: "Server error." });
+    console.error(error);
+    res.status(500).json({ message: 'Server error' });
   }
 };
-exports.createmany=async(req, res) => {
- 
+
+exports.insertManyProducts = async (req, res) => {
   try {
-    // Extract array of products from request body
-    const products = req.body;
-
-    // Use insertMany to save multiple documents
-    const insertedProducts = await Product.insertMany(products);
-
-    // Send success response
-    res.status(201).json({
-      message: 'Products inserted successfully',
-      data: insertedProducts,
-    });
+    const products = await Product.insertMany(await req.body);
+    res.status(200).json(products);
   } catch (error) {
-    // Send error response
-    res.status(500).json({
-      message: 'Error inserting products',
-      error: error.message,
-    });
+    console.error(error);
+    res.status(500).json({ message: 'Server error' });
   }
-}
-// Get all products
+};
+// Get All Products
 exports.getAllProducts = async (req, res) => {
-  
   try {
-
     const products = await Product.find();
     res.status(200).json(products);
   } catch (error) {
-    console.error("Error fetching products:", error);
-    res.status(500).json({ message: "Server error." });
+    console.error(error);
+    res.status(500).json({ message: 'Server error' });
   }
 };
-exports.getProductswithpage = async (req, res) => {
-  const body= await req.body
- const pageNumber=body.pageNumber
- try {
-   DButils.findWithSkipAndLimit(
-     req,
-     res,
-     Product,
-     {},
-     pageNumber,
-     req.body.limit
-   );
-   // const products = await Product.find();
-   // res.status(200).json(products);
- } catch (error) {
-   console.error("Error fetching products:", error);
-   res.status(500).json({ message: "Server error." });
- }
-};
-// Get a single product by ID
+
+// Get Product by ID
 exports.getProductById = async (req, res) => {
   try {
     const product = await Product.findById(req.params.id);
-    if (!product) {
-      return res.status(404).json({ message: "Product not found." });
-    }
+    if (!product) return res.status(404).json({ message: 'Product not found' });
+
     res.status(200).json(product);
   } catch (error) {
-    console.error("Error fetching product:", error);
-    res.status(500).json({ message: "Server error." });
+    console.error(error);
+    res.status(500).json({ message: 'Server error' });
   }
 };
 
-// Update product details
+// Update Product
 exports.updateProduct = async (req, res) => {
   try {
-    const { category, brand, name, image, topSeller, price } = req.body;
+    const { name, description, category, brand, price, stock, images, sku } = req.body;
+
     const updatedProduct = await Product.findByIdAndUpdate(
       req.params.id,
-      {
-        category,
-        brand,
-        name,
-        image,
-        topSeller,
-        price
-      },
+      { name, description, category, brand, price, stock, images, sku },
       { new: true }
     );
 
-    if (!updatedProduct) {
-      return res.status(404).json({ message: "Product not found." });
-    }
+    if (!updatedProduct) return res.status(404).json({ message: 'Product not found' });
 
-    res.status(200).json(updatedProduct);
-
+    res.status(200).json({ message: 'Product updated successfully', product: updatedProduct });
   } catch (error) {
-    console.error("Error updating product:", error);
-    res.status(500).json({ message: "Server error." });
+    console.error(error);
+    res.status(500).json({ message: 'Server error' });
   }
 };
 
-// Delete a product
+// Delete Product
 exports.deleteProduct = async (req, res) => {
   try {
-    const product = await Product.findByIdAndDelete(req.params.id);
-    if (!product) {
-      return res.status(404).json({ message: "Product not found." });
-    }
-    res.status(200).json({ message: "Product deleted successfully." });
+    const deletedProduct = await Product.findByIdAndDelete(req.params.id);
+    if (!deletedProduct) return res.status(404).json({ message: 'Product not found' });
+
+    res.status(200).json({ message: 'Product deleted successfully' });
   } catch (error) {
-    console.error("Error deleting product:", error);
-    res.status(500).json({ message: "Server error." });
+    console.error(error);
+    res.status(500).json({ message: 'Server error' });
+  }
+};
+
+// Search Products
+exports.searchProducts = async (req, res) => {
+
+
+  
+  try {
+  
+    const { category, brand, price_min, price_max ,pageNumber,limit} = req.query;
+
+    const filter = {};
+    if (category) filter.category = category;
+    if (brand) filter.brand = brand;
+    if (price_min && price_max) filter.price = { $gte: price_min, $lte: price_max };
+    DButils.findWithSkipAndLimit(
+      req,
+      res,
+      Product,
+      filter,
+      pageNumber,
+      limit
+    );
+    // const products = await Product.find(filter);
+    // res.status(200).json(products);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: 'Server error' });
   }
 };
