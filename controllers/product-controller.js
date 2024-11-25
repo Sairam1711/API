@@ -3,8 +3,8 @@ const DButils=require('../utils/DButils')
 // Create Product
 exports.createProduct = async (req, res) => {
   try {
-    const { name, description, category, brand, price, stock, images, sku ,topSeller} = req.body;
-
+    const { name, description, category, brand, price, stock, sku ,topSeller} = req.body;
+    const images = req.files.map(file => file.filename);
     // Check if product exists
     const existingProduct = await Product.findOne({ sku });
     if (existingProduct) return res.status(400).json({ message: 'Product already exists' });
